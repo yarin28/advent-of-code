@@ -1,4 +1,4 @@
-use day_01::part1::process;
+use day_02::part1::process;
 use miette::Context;
 
 #[cfg(feature = "dhat-heap")]
