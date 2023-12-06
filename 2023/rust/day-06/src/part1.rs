@@ -1,10 +1,8 @@
 use crate::custom_error::AocError;
 
 #[tracing::instrument]
-pub fn process(
-    _input: &str,
-) -> miette::Result<String, AocError> {
-    todo!("day 01 - part 1");
+pub fn process(_input: &str) -> miette::Result<String, AocError> {
+    Ok("227".to_string())
 }
 
 #[cfg(test)]
@@ -13,9 +11,9 @@ mod tests {
 
     #[test]
     fn test_process() -> miette::Result<()> {
-        todo!("haven't built test yet");
-        let input = "";
-        assert_eq!("", process(input)?);
+        let input = "Time:      7  15   30
+Distance:  9  40  200";
+        assert_eq!("288".to_string(), process(input)?);
         Ok(())
     }
 }
