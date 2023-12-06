@@ -1,16 +1,14 @@
 use std::collections::HashSet;
 
 use nom::{
-    branch::alt,
-    bytes::complete::{tag, take},
-    character::complete::{digit1, line_ending, multispace0, multispace1, newline, space0, space1},
+    bytes::complete::tag,
+    character::complete::{digit1, line_ending, space0, space1},
     multi::{fold_many1, separated_list1},
-    sequence::{delimited, preceded, separated_pair, terminated, tuple},
+    sequence::{delimited, separated_pair, terminated, tuple},
     IResult,
 };
 
 use crate::custom_error::AocError;
-use nom::character::complete::char;
 use nom::character::complete::u32;
 
 #[derive(Debug)]
