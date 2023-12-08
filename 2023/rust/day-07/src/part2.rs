@@ -2,8 +2,9 @@
 #![allow(dead_code)]
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
+use std::ops::Deref;
 
-use itertools::Itertools;
+use itertools::{Itertools, Position};
 use nom::bytes::complete::take_until;
 use nom::character::complete::space1;
 use nom::multi::separated_list1;
@@ -13,17 +14,16 @@ use crate::custom_error::AocError;
 #[derive(Debug, Clone)]
 pub struct Hand {
     cards: Vec<char>,
-    hand_type: Option<Type>,
     bid_amount: u32,
-    rank: Option<u32>,
+    rank: (Type, (u32, u32, u32, u32, u32)),
 }
 
 impl Ord for Hand {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         dbg!("here");
-        if self.hand_type > other.hand_type {
+        if self.rank.0 > other.rank.0 {
             return Ordering::Greater;
-        } else if self.hand_type < other.hand_type {
+        } else if self.rank.0 < other.rank.0 {
             return Ordering::Less;
         } else {
             let mut order = Ordering::Equal;
@@ -67,9 +67,9 @@ impl PartialOrd for Hand {
     }
 
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        if self.hand_type > other.hand_type {
+        if self.rank.0 > other.rank.0 {
             return Some(Ordering::Greater);
-        } else if self.hand_type < other.hand_type {
+        } else if self.rank.0 < other.rank.0 {
             return Some(Ordering::Less);
         } else {
             let mut order = Ordering::Equal;
@@ -99,50 +99,58 @@ impl PartialOrd for Hand {
     }
 }
 impl Hand {
-    pub fn evalueate_hand_type(&mut self) {
-        let card_symbol_and_amount = self.cards.iter().counts();
-        let mut max_num = 0;
-        let mut max_char = ' ';
-        card_symbol_and_amount.iter().for_each(|(c, num)| {
-            if *num > max_num && **c != 'J' {
-                max_num = *num;
-                max_char = **c;
+    fn score_hand(hand: &str) -> (Type, (u32, u32, u32, u32, u32)) {
+        use Type::*;
+
+        let counts = hand.chars().counts();
+
+        let values = if let Some(joker_count) = counts.get(&'J') {
+            if *joker_count == 5 {
+                "5".to_string()
+            } else {
+                counts
+                    .iter()
+                    .filter_map(|(key, value)| (key != &'J').then_some(value))
+                    .sorted()
+                    .with_position()
+                    .map(|(position, value)| match position {
+                        Position::Last | Position::Only => value + joker_count,
+                        _ => *value,
+                    })
+                    .join("")
             }
-        });
-        max_num += card_symbol_and_amount.get(&'J').unwrap_or(&0);
-        if max_num == 5 {
-            self.hand_type = Some(Type::FiveOfAKind);
-        } else if max_num == 4 {
-            self.hand_type = Some(Type::FourOfAKind);
-        } else if max_num == 3 && card_symbol_and_amount.values().any(|num| *num == 2) {
-            self.hand_type = Some(Type::FullHouse);
-        } else if max_num == 3 && card_symbol_and_amount.values().all(|num| *num != 2) {
-            self.hand_type = Some(Type::ThreeOfAKind);
-        } else if max_num == 2
-            && card_symbol_and_amount
-                .values()
-                .filter(|num| **num == 2)
-                .count()
-                == 2
-        {
-            self.hand_type = Some(Type::TwoPair);
-        } else if max_num == 2
-            && card_symbol_and_amount
-                .values()
-                .filter(|num| **num == 2)
-                .count()
-                == 1
-        {
-            self.hand_type = Some(Type::OnePair);
         } else {
-            self.hand_type = Some(Type::HighCard);
-        }
-        dbg!(&self.cards, max_num, self.hand_type);
+            counts.values().sorted().join("")
+        };
+
+        let hand_type = match values.deref() {
+            "5" => FiveOfAKind,
+            "14" => FourOfAKind,
+            "23" => FullHouse,
+            "113" => ThreeOfAKind,
+            "122" => TwoPair,
+            "1112" => OnePair,
+            "11111" => HighCard,
+            value => panic!("should never happen. Encountered `{}`", value),
+        };
+        let card_scores = hand
+            .chars()
+            .map(|card| match card {
+                'A' => 14,
+                'K' => 13,
+                'Q' => 12,
+                'J' => 1,
+                'T' => 10,
+                value => value.to_digit(10).unwrap(),
+            })
+            .collect_tuple()
+            .unwrap();
+        (hand_type, card_scores)
     }
 }
 impl PartialEq for Hand {
     fn eq(&self, other: &Self) -> bool {
-        if self.hand_type == other.hand_type {
+        if self.rank.0 == other.rank.0 {
             return false;
         }
 
@@ -166,14 +174,13 @@ fn hand(input: &str) -> IResult<&str, Hand> {
     let (input, cards) = take_until(" ")(input)?;
     let (input, _space) = space1(input)?;
     let (input, bid_amount) = nom::character::complete::u32(input)?;
-    let cards = cards.chars().collect::<Vec<char>>();
+    let cards = cards.chars().collect::<String>();
     Ok((
         input,
         Hand {
-            cards,
+            cards: cards.chars().collect::<Vec<char>>(),
+            rank: Hand::score_hand(&cards),
             bid_amount,
-            rank: None,
-            hand_type: None,
         },
     ))
 }
@@ -202,7 +209,6 @@ fn create_card_type_map() -> BTreeMap<char, i32> {
 #[tracing::instrument]
 pub fn process(input: &str) -> miette::Result<String, AocError> {
     let (_input, mut hands) = parse(input).expect("valid input");
-    hands.iter_mut().for_each(|hand| hand.evalueate_hand_type());
     hands.sort();
     dbg!(&hands);
     let mut res = 0;
@@ -210,6 +216,7 @@ pub fn process(input: &str) -> miette::Result<String, AocError> {
         res += (index + 1) as u32 * hand.bid_amount
     }
     Ok(res.to_string())
+    // Ok("ga".to_string())
 }
 
 #[cfg(test)]
