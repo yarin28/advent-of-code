@@ -1,0 +1,50 @@
+use crate::custom_error::AocError;
+use nom::branch::alt;
+use nom::{IResult, multi::separated_list1, character::complete::newline, combinator::iterator};
+use nom::bytes::complete::tag;
+
+pub struct Tile {
+    tile_type: Type,
+    is_energized: bool,
+}
+pub enum Type {
+    Empty,
+    MirorTopLeft,
+    MirorTopRight,
+    VerticalSpliter,
+    HorizontalSpliter,
+}
+fn parse_line(input:&str)-> IResult<&str,Vec<Tile>>{
+    let (input,tiles) = iterator(input, alt((tag("|"),tag("-"),tag("\\"),tag("/"),tag("."))))
+        Ok((input,tiles))
+}
+fn parse(input: &str) -> IResult<&str, Vec<Vec<Tile>>> {
+    let (input,lines) = separated_list1(newline, parse_line)(input)?;
+Ok((input,lines))
+}
+
+#[tracing::instrument]
+pub fn process(_input: &str) -> miette::Result<String, AocError> {
+    Ok("44".to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_process() -> miette::Result<()> {
+        let input = r".|...\....
+|.-.\.....
+.....|-...
+........|.
+..........
+.........\
+..../.\\..
+.-.-/..|..
+.|....-|.\
+..//.|....";
+        assert_eq!("46".to_string(), process(input)?);
+        Ok(())
+    }
+}
