@@ -1,4 +1,7 @@
 use core::fmt;
+use glam::i64vec2;
+use nom::bytes::complete::take;
+use nom::number::complete::hex_u32;
 use std::iter;
 use std::ops::Index;
 use std::ops::IndexMut;
@@ -121,6 +124,7 @@ pub fn dig_instruction_parse(input: &str) -> IResult<&str, DigInstruction> {
     ))(input)?;
     let (input, count) = delimited(space1, complete::u32, space1)(input)?;
     let (input, color) = delimited(tag("(#"), hex_digit1, tag(")"))(input)?;
+
     Ok((
         input,
         DigInstruction {
@@ -134,7 +138,7 @@ pub fn parse(input: &str) -> IResult<&str, Vec<DigInstruction>> {
     let (input, dig_instructions) = separated_list1(newline, dig_instruction_parse)(input)?;
     Ok((input, dig_instructions))
 }
-pub fn find_max_direction(dig_instructions: &Vec<DigInstruction>, direction: Direction) -> u32 {
+pub fn find_max_direction(dig_instructions: &[DigInstruction], direction: Direction) -> u32 {
     let oppesite_direction = direction.find_opposite_direction();
     let mut max_length = 0;
     let mut current_length = 0;
@@ -171,41 +175,49 @@ pub fn insert_the_trenches(dig_instructions: &Vec<DigInstruction>, ground: &mut 
             acc
         });
 }
-pub fn fill_pool(ground: &mut Ground) {
-    let mut is_inside_poll: bool = false;
-    let mut last_tile: Tile = Tile::Ground;
-    let cursor = Cursor { x: 0, y: 0 };
-    for line in ground.ground.iter() {
-        for tile in line.iter() {
-            if ground[&cursor] == Tile::Trench && !is_inside_poll {
-                is_inside_poll = true;
-            }
+
+pub fn solve(instructions: &[DigInstruction]) -> u64 {
+    let mut current = i64vec2(0, 0);
+    let mut prev = i64vec2(0, 0);
+    let mut count = 0;
+    let mut sum = 0;
+    for instruction in instructions {
+        match instruction.direction {
+            Direction::Up => current.y -= instruction.count as i64,
+            Direction::Down => current.y += instruction.count as i64,
+            Direction::Left => current.x -= instruction.count as i64,
+            Direction::Right => current.x += instruction.count as i64,
+            Direction::None => unreachable!("advent of code input should be valid"),
         }
+        sum += current.x * prev.y - current.y * prev.x;
+        count += instruction.count;
+        prev = current;
     }
+    (sum.abs() as u64) / 2 + count as u64 / 2 + 1
 }
 
 #[tracing::instrument]
 pub fn process(input: &str) -> miette::Result<String, AocError> {
     let (input, grid) = parse(input).expect("a valid parse");
-    let mut ground: Ground = Ground {
-        ground: iter::repeat(
-            iter::repeat(Tile::Ground)
-                .take(
-                    find_max_direction(&grid, Direction::Right)
-                        .try_into()
-                        .unwrap(),
-                )
-                .collect_vec(),
-        )
-        .take(
-            find_max_direction(&grid, Direction::Down)
-                .try_into()
-                .unwrap(),
-        )
-        .collect_vec(),
-    };
-    insert_the_trenches(&grid, &mut ground);
-    dbg!(ground);
+    // let mut ground: Ground = Ground {
+    //     ground: iter::repeat(
+    //         iter::repeat(Tile::Ground)
+    //             .take(
+    //                 find_max_direction(&grid, Direction::Right)
+    //                     .try_into()
+    //                     .unwrap(),
+    //             )
+    //             .collect_vec(),
+    //     )
+    //     .take(
+    //         find_max_direction(&grid, Direction::Down)
+    //             .try_into()
+    //             .unwrap(),
+    //     )
+    //     .collect_vec(),
+    // };
+    // insert_the_trenches(&grid, &mut ground);
+    dbg!(solve(&grid));
     todo!();
 }
 

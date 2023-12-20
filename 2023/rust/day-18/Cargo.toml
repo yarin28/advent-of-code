@@ -15,6 +15,7 @@ thiserror = { workspace = true }
 dhat = { workspace = true }
 anyhow = "1.0.75"
 nom-supreme = { workspace = true }
+glam = { workspace = true }
 
 [dev-dependencies]
 divan = { workspace = true }
